@@ -204,8 +204,9 @@ runs:
         bun install
         echo "Base-action dependencies installed"
         cd -
-        # Install Claude Code globally
-        bun install -g @anthropic-ai/claude-code@2.1.217
+        # Install Claude Code globally via npm (not bun: bun blocks the
+        # postinstall script that makes the `claude` binary executable).
+        npm install -g @anthropic-ai/claude-code@2.1.217
 
     - name: Setup Network Restrictions
       if: steps.prepare.outputs.contains_trigger == 'true' && inputs.experimental_allowed_domains != ''

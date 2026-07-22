@@ -1,7 +1,11 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import {
   parseMultilineInput,
   parseAdditionalPermissions,
+  resolveInputFileOrInline,
 } from "../../src/github/context";
 
 describe("parseMultilineInput", () => {
@@ -111,5 +115,57 @@ packages: write`;
     const result = parseAdditionalPermissions(input);
     expect(result.get("actions")).toBe("read");
     expect(result.size).toBe(1);
+  });
+});
+
+describe("resolveInputFileOrInline", () => {
+  let tmpDir: string;
+  let prevWorkspace: string | undefined;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "prompt-input-"));
+    prevWorkspace = process.env.GITHUB_WORKSPACE;
+    process.env.GITHUB_WORKSPACE = tmpDir;
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (prevWorkspace === undefined) {
+      delete process.env.GITHUB_WORKSPACE;
+    } else {
+      process.env.GITHUB_WORKSPACE = prevWorkspace;
+    }
+  });
+
+  it("returns the inline value when no file path is given", () => {
+    expect(resolveInputFileOrInline("inline-instructions", "")).toBe(
+      "inline-instructions",
+    );
+  });
+
+  it("reads file contents relative to GITHUB_WORKSPACE when a path is set", () => {
+    fs.writeFileSync(path.join(tmpDir, "review.md"), "file-instructions");
+    expect(resolveInputFileOrInline("inline-instructions", "review.md")).toBe(
+      "file-instructions",
+    );
+  });
+
+  it("lets the file take precedence over the inline value", () => {
+    fs.writeFileSync(path.join(tmpDir, "review.md"), "from-file");
+    expect(resolveInputFileOrInline("ignored-inline", "review.md")).toBe(
+      "from-file",
+    );
+  });
+
+  it("resolves an absolute path", () => {
+    const abs = path.join(tmpDir, "abs.md");
+    fs.writeFileSync(abs, "absolute-content");
+    expect(resolveInputFileOrInline("", abs)).toBe("absolute-content");
+  });
+
+  it("throws when the file does not exist", () => {
+    expect(() => resolveInputFileOrInline("", "missing.md")).toThrow(
+      /Prompt file not found/,
+    );
   });
 });

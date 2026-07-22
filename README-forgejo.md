@@ -34,6 +34,7 @@ This is a Forgejo-compatible version of the Claude Code Action that enables Clau
 ### 2. Add Secrets to Your Repository
 
 In your repository settings, add these secrets:
+
 - `FORGEJO_TOKEN`: Your Forgejo access token
 - Either:
   - `ANTHROPIC_API_KEY`: Your Anthropic API key (for direct API access)
@@ -57,11 +58,11 @@ jobs:
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'issues' && contains(github.event.issue.body, '@claude'))
-    
+
     runs-on: docker
     container:
       image: ubuntu:latest
-    
+
     steps:
       - name: Install dependencies
         run: |
@@ -85,32 +86,40 @@ jobs:
 ## Usage
 
 ### In Issues
+
 Create an issue with `@claude` in the body, or comment `@claude` followed by your request:
+
 ```
 @claude Can you help me implement a new feature for user authentication?
 ```
 
 ### In Pull Requests
+
 Comment on a PR with `@claude` to get code review or assistance:
+
 ```
 @claude Please review this code and suggest improvements
 ```
 
 ### Assignee Trigger
+
 Assign an issue to a user named `claude` to trigger the action.
 
 ### Label Trigger
+
 Add the `claude` label to an issue to trigger the action.
 
 ## Configuration Options
 
 ### Required Parameters
+
 - `forgejo_token`: Forgejo access token (usually from secrets)
 - Either:
   - `anthropic_api_key`: Your Anthropic API key
   - `claude_code_oauth_token`: Your Claude Code OAuth token
 
 ### Optional Parameters
+
 - `forgejo_url`: Forgejo API URL (auto-detected from `GITHUB_API_URL` if not specified)
 - `model`: Claude model to use (default: `claude-3-5-sonnet-20241022`)
 - `trigger_phrase`: Phrase to trigger Claude (default: `@claude`)
@@ -118,7 +127,20 @@ Add the `claude` label to an issue to trigger the action.
 - `timeout_minutes`: Timeout for Claude's response (default: `30`, example uses `180`)
 - `allowed_tools`: Tools Claude can use (example: `"read,write,bash,grep,ls"`)
 - `custom_instructions`: Additional instructions for Claude
+- `custom_instructions_file`: Path to a file whose contents replace `custom_instructions` (file takes precedence when set; relative to the workspace root)
+- `direct_prompt_file`: Path to a file whose contents replace `direct_prompt` (file takes precedence when set; relative to the workspace root)
+- `suppress_claude_md`: When `true`, remove the repository's `CLAUDE.md` files before Claude Code runs and omit the "follow CLAUDE.md" prompt instructions, so the dev `CLAUDE.md` does not steer a CI agent (default: `false`)
 - `use_sticky_comment`: Use a single comment that updates with progress (default: `true`)
+
+### Prompt files & CLAUDE.md suppression
+
+`custom_instructions_file` and `direct_prompt_file` let you keep prompts as files
+in the repo (e.g. `.forgejo/prompts/<scope>/instructions.md`) instead of inline
+YAML strings — the file contents are read at runtime and take precedence over
+the inline `custom_instructions` / `direct_prompt`. `suppress_claude_md: true`
+removes the repository's `CLAUDE.md` (and `.claude/CLAUDE.md`) before the run and
+drops the "follow CLAUDE.md" prompt lines, so a CI review agent is steered only
+by its prompt file, not the repo's dev-facing `CLAUDE.md`.
 
 ## Limitations
 
@@ -132,10 +154,12 @@ Add the `claude` label to an issue to trigger the action.
 ### Common Issues
 
 1. **Authentication Errors**
+
    - Verify your `FORGEJO_TOKEN` has the correct permissions
    - Check that the token hasn't expired
 
 2. **API Errors**
+
    - Ensure your `forgejo_url` is correct (should end with `/api/v1`)
    - Check Forgejo logs for detailed error messages
 
@@ -146,6 +170,7 @@ Add the `claude` label to an issue to trigger the action.
 ### Debug Mode
 
 Enable debug logging by adding to your workflow:
+
 ```yaml
 env:
   ACTIONS_STEP_DEBUG: true
@@ -173,6 +198,7 @@ If migrating from GitHub to Forgejo:
 ## Support
 
 For issues specific to Forgejo support, please:
+
 1. Check existing issues in the repository
 2. Create a new issue with the `forgejo` label
 3. Include your Forgejo version and configuration

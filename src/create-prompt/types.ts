@@ -8,6 +8,7 @@ export type CommonFields = {
   disallowedTools?: string;
   directPrompt?: string;
   overridePrompt?: string;
+  suppressClaudeMd?: boolean;
 };
 
 type PullRequestReviewCommentEvent = {

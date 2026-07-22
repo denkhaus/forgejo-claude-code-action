@@ -11,6 +11,8 @@ import type { ModeName } from "../modes/types";
 import { DEFAULT_MODE, isValidMode } from "../modes/registry";
 import { detectPlatform, Platform } from "../platform/detector";
 import { isForgejoIssuePR } from "../forgejo/context";
+import * as fs from "fs";
+import * as path from "path";
 
 export type ParsedGitHubContext = {
   runId: string;
@@ -45,6 +47,8 @@ export type ParsedGitHubContext = {
     useStickyComment: boolean;
     additionalPermissions: Map<string, string>;
     useCommitSigning: boolean;
+    // Optional because mocks omit it; parseGitHubContext always sets it.
+    suppressClaudeMd?: boolean;
   };
 };
 
@@ -57,10 +61,11 @@ export function parseGitHubContext(): ParsedGitHubContext {
   }
 
   const platformConfig = detectPlatform();
-  const runId = platformConfig.platform === Platform.Forgejo 
-    ? process.env.GITHUB_RUN_NUMBER!
-    : process.env.GITHUB_RUN_ID!;
-    
+  const runId =
+    platformConfig.platform === Platform.Forgejo
+      ? process.env.GITHUB_RUN_NUMBER!
+      : process.env.GITHUB_RUN_ID!;
+
   const commonFields = {
     runId: runId,
     eventName: context.eventName,
@@ -78,8 +83,15 @@ export function parseGitHubContext(): ParsedGitHubContext {
       labelTrigger: process.env.LABEL_TRIGGER ?? "",
       allowedTools: parseMultilineInput(process.env.ALLOWED_TOOLS ?? ""),
       disallowedTools: parseMultilineInput(process.env.DISALLOWED_TOOLS ?? ""),
-      customInstructions: process.env.CUSTOM_INSTRUCTIONS ?? "",
-      directPrompt: process.env.DIRECT_PROMPT ?? "",
+      customInstructions: resolveInputFileOrInline(
+        process.env.CUSTOM_INSTRUCTIONS ?? "",
+        process.env.CUSTOM_INSTRUCTIONS_FILE ?? "",
+      ),
+      directPrompt: resolveInputFileOrInline(
+        process.env.DIRECT_PROMPT ?? "",
+        process.env.DIRECT_PROMPT_FILE ?? "",
+      ),
+      suppressClaudeMd: process.env.SUPPRESS_CLAUDE_MD === "true",
       overridePrompt: process.env.OVERRIDE_PROMPT ?? "",
       baseBranch: process.env.BASE_BRANCH,
       branchPrefix: process.env.BRANCH_PREFIX ?? "claude/",
@@ -103,12 +115,13 @@ export function parseGitHubContext(): ParsedGitHubContext {
     case "issue_comment": {
       const platformConfig = detectPlatform();
       const issueCommentPayload = context.payload as IssueCommentEvent;
-      
+
       // For Forgejo, use custom PR detection
-      const isPR = platformConfig.platform === Platform.Forgejo
-        ? isForgejoIssuePR(context)
-        : Boolean(issueCommentPayload.issue.pull_request);
-      
+      const isPR =
+        platformConfig.platform === Platform.Forgejo
+          ? isForgejoIssuePR(context)
+          : Boolean(issueCommentPayload.issue.pull_request);
+
       return {
         ...commonFields,
         payload: issueCommentPayload,
@@ -153,6 +166,31 @@ export function parseMultilineInput(s: string): string[] {
     .map((tool) => tool.replace(/#.+$/, ""))
     .map((tool) => tool.trim())
     .filter((tool) => tool.length > 0);
+}
+
+/**
+ * Resolve a prompt input from a file path or an inline string. If `filePath`
+ * is set, its contents are read (relative to GITHUB_WORKSPACE, or absolute)
+ * and take precedence over `inline`. Throws if the file is missing so a
+ * misconfigured `*_file` input fails loudly instead of silently falling back.
+ */
+export function resolveInputFileOrInline(
+  inline: string,
+  filePath: string,
+): string {
+  if (!filePath) {
+    return inline;
+  }
+  const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
+  const resolved = path.isAbsolute(filePath)
+    ? filePath
+    : path.resolve(workspace, filePath);
+  if (!fs.existsSync(resolved)) {
+    throw new Error(
+      `Prompt file not found: ${filePath} (resolved: ${resolved})`,
+    );
+  }
+  return fs.readFileSync(resolved, "utf8");
 }
 
 export function parseAdditionalPermissions(s: string): Map<string, string> {

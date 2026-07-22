@@ -60,6 +60,18 @@ inputs:
     description: "Complete replacement of Claude's prompt with custom template (supports variable substitution)"
     required: false
     default: ""
+  custom_instructions_file:
+    description: "Path to a file whose contents replace 'custom_instructions' (file takes precedence when set). Relative to the workspace root."
+    required: false
+    default: ""
+  direct_prompt_file:
+    description: "Path to a file whose contents replace 'direct_prompt' (file takes precedence when set). Relative to the workspace root."
+    required: false
+    default: ""
+  suppress_claude_md:
+    description: "When 'true', remove the repository's CLAUDE.md files before Claude Code runs and omit the 'follow CLAUDE.md' prompt instructions, so the dev CLAUDE.md does not steer the CI agent."
+    required: false
+    default: "false"
   mcp_config:
     description: "Additional MCP configuration (JSON string) that merges with the built-in GitHub MCP servers"
   additional_permissions:
@@ -141,12 +153,19 @@ runs:
       uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # https://github.com/oven-sh/setup-bun/releases/tag/v2.0.2
       with:
         bun-version: 1.2.11
-        
+
     - name: Install Dependencies
       shell: bash
       run: |
         cd ${GITHUB_ACTION_PATH}
         bun install
+
+    - name: Suppress project CLAUDE.md
+      if: inputs.suppress_claude_md == 'true'
+      shell: bash
+      run: |
+        rm -f "$GITHUB_WORKSPACE/CLAUDE.md" "$GITHUB_WORKSPACE/.claude/CLAUDE.md"
+        echo "Suppressed project CLAUDE.md (suppress_claude_md=true)."
 
     - name: Prepare action
       id: prepare
@@ -172,6 +191,9 @@ runs:
         ACTIONS_TOKEN: ${{ github.token }}
         ADDITIONAL_PERMISSIONS: ${{ inputs.additional_permissions }}
         USE_COMMIT_SIGNING: ${{ inputs.use_commit_signing }}
+        CUSTOM_INSTRUCTIONS_FILE: ${{ inputs.custom_instructions_file }}
+        DIRECT_PROMPT_FILE: ${{ inputs.direct_prompt_file }}
+        SUPPRESS_CLAUDE_MD: ${{ inputs.suppress_claude_md }}
 
     - name: Install Base Action Dependencies
       if: steps.prepare.outputs.contains_trigger == 'true'
@@ -293,4 +315,3 @@ runs:
           cat "${{ steps.claude-code.outputs.execution_file }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
         fi
-

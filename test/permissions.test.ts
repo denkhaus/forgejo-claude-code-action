@@ -146,6 +146,43 @@ describe("checkWritePermissions", () => {
     );
   });
 
+  test("should skip (return true) on 403 for Forgejo — non-admin token can't query actor permission", async () => {
+    const error: any = new Error("Forbidden");
+    error.status = 403;
+    const mockOctokit = {
+      repos: {
+        getCollaboratorPermissionLevel: async () => {
+          throw error;
+        },
+      },
+    } as any;
+    const context = createContext();
+
+    const result = await checkWritePermissions(mockOctokit, context);
+
+    expect(result).toBe(true);
+    expect(coreWarningSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Permission check skipped on Forgejo (403)"),
+    );
+  });
+
+  test("should skip (return true) on 404 for Forgejo", async () => {
+    const error: any = new Error("Not found");
+    error.status = 404;
+    const mockOctokit = {
+      repos: {
+        getCollaboratorPermissionLevel: async () => {
+          throw error;
+        },
+      },
+    } as any;
+    const context = createContext();
+
+    const result = await checkWritePermissions(mockOctokit, context);
+
+    expect(result).toBe(true);
+  });
+
   test("should call API with correct parameters", async () => {
     let capturedParams: any;
     const mockOctokit = {

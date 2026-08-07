@@ -40,19 +40,23 @@ export async function checkWritePermissions(
       return false;
     }
   } catch (error: any) {
-    // Special handling for Forgejo - if the API endpoint is not available,
-    // we might want to skip the check
-    if (error.status === 404) {
-      core.warning(`Permission check endpoint not available (404). This might be expected for Forgejo.`);
-      // For Forgejo, we might want to allow the action to proceed
-      // if the permission check endpoint is not implemented
+    // Forgejo: a non-admin collaborator token can query only its OWN permission,
+    // so querying the triggering actor's permission returns 403
+    // ("collaborators can query only their own"); 404 means the endpoint isn't
+    // available. Both are token/endpoint limits, NOT evidence the actor lacks
+    // write access — skip the check on Forgejo. (Defense-in-depth only: the
+    // review-agent fires per-workflow regardless, and @claude gating is already
+    // best-effort when a non-admin bot token is used.)
+    if (error.status === 403 || error.status === 404) {
       const platformConfig = (await import("../../platform/detector")).detectPlatform();
       if (platformConfig.platform === "forgejo") {
-        core.info(`Skipping permission check for Forgejo platform due to missing endpoint`);
+        core.warning(
+          `Permission check skipped on Forgejo (${error.status}): cannot verify actor '${actor}' permission with this token — proceeding.`,
+        );
         return true;
       }
     }
-    
+
     core.error(`Failed to check permissions: ${error}`);
     throw new Error(`Failed to check permissions for ${actor}: ${error}`);
   }

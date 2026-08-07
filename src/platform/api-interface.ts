@@ -109,6 +109,17 @@ export interface CreateBranchParams {
   sha: string;
 }
 
+export interface CreateReviewParams {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  // Forgejo POST /pulls/{n}/reviews `event` values (match the SDK's
+  // ReviewStateType: APPROVED, REQUEST_CHANGES, COMMENT).
+  event: 'APPROVED' | 'REQUEST_CHANGES' | 'COMMENT';
+  body: string;
+  commitId?: string;
+}
+
 /**
  * Platform-agnostic API client interface
  */
@@ -120,6 +131,7 @@ export interface IPlatformClient {
   
   // Pull request operations
   getPullRequest(owner: string, repo: string, number: number): Promise<PullRequest>;
+  createPullReview(params: CreateReviewParams): Promise<Review>;
   
   // Repository operations
   getRepository(owner: string, repo: string): Promise<Repository>;

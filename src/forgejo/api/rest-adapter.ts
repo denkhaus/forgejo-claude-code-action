@@ -5,12 +5,14 @@
 import { createOctokit, Octokits } from '../../github/api/client';
 import { ForgejoClient } from './client';
 import { detectPlatform, Platform, getPlatformToken } from '../../platform/detector';
-import { 
+import {
   IPlatformClient,
   Issue,
   PullRequest,
   Comment,
   Repository,
+  type Review,
+  type CreateReviewParams,
   User
 } from '../../platform/api-interface';
 
@@ -271,6 +273,33 @@ class GitHubClientAdapter implements IPlatformClient {
       },
       createdAt: data.created_at,
       updatedAt: data.updated_at,
+    };
+  }
+
+  async createPullReview(params: CreateReviewParams): Promise<Review> {
+    // NOTE: inert on this fork — detectPlatform() is hard-coded to Forgejo, so
+    // the ForgejoClient path is always used. Kept for interface parity; octokit
+    // uses the imperative event verb ("APPROVE"), our param carries the SDK
+    // past-tense ("APPROVED"), so map the one differing value.
+    const { data } = await this.octokit.rest.pulls.createReview({
+      owner: params.owner,
+      repo: params.repo,
+      pull_number: params.prNumber,
+      event: params.event === 'APPROVED' ? 'APPROVE' : params.event,
+      body: params.body,
+      ...(params.commitId ? { commit_id: params.commitId } : {}),
+    });
+
+    return {
+      id: data.id,
+      author: {
+        login: data.user?.login || '',
+        id: data.user?.id || 0,
+      },
+      body: data.body || '',
+      state: (data.state as Review['state']) || 'COMMENTED',
+      submittedAt: data.submitted_at || '',
+      comments: [],
     };
   }
 

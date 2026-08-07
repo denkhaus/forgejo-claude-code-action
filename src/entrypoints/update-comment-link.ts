@@ -15,6 +15,8 @@ import { checkAndCommitOrDeleteBranch } from "../github/operations/branch-cleanu
 import { updateClaudeComment } from "../github/operations/comments/update-claude-comment";
 import { detectPlatform, Platform } from "../platform/detector";
 import { getExternalBaseUrl } from "../platform/url-utils";
+import { createPlatformClient } from "../forgejo/api/rest-adapter";
+import { parseVerdict } from "../github/operations/reviews/verdict";
 
 async function run() {
   try {
@@ -177,6 +179,7 @@ async function run() {
     } | null = null;
     let actionFailed = false;
     let errorDetails: string | undefined;
+    let resultText = "";
 
     // First check if prepare step failed
     const prepareSuccess = process.env.PREPARE_SUCCESS !== "false";
@@ -196,16 +199,17 @@ async function run() {
           // Output file is an array, get the last element which contains execution details
           if (Array.isArray(outputData) && outputData.length > 0) {
             const lastElement = outputData[outputData.length - 1];
-            if (
-              lastElement.type === "result" &&
-              "cost_usd" in lastElement &&
-              "duration_ms" in lastElement
-            ) {
-              executionDetails = {
-                cost_usd: lastElement.cost_usd,
-                duration_ms: lastElement.duration_ms,
-                duration_api_ms: lastElement.duration_api_ms,
-              };
+            if (lastElement.type === "result") {
+              // The agent's final writeup — the verdict marker lives here.
+              resultText =
+                typeof lastElement.result === "string" ? lastElement.result : "";
+              if ("cost_usd" in lastElement && "duration_ms" in lastElement) {
+                executionDetails = {
+                  cost_usd: lastElement.cost_usd,
+                  duration_ms: lastElement.duration_ms,
+                  duration_api_ms: lastElement.duration_api_ms,
+                };
+              }
             }
           }
         }
@@ -217,6 +221,53 @@ async function run() {
         console.error("Error reading output file:", error);
         // If we can't read the file, check for any failure markers
         actionFailed = process.env.CLAUDE_SUCCESS === "false";
+      }
+    }
+
+    // posting_mode: review — post a structured PR review parsed from the agent's
+    // verdict, and reduce the tracking comment to a one-liner. PRs only. On any
+    // failure, fall through to the standard comment update so output isn't lost.
+    const postingMode = process.env.POSTING_MODE || "comment";
+    if (
+      postingMode === "review" &&
+      context.isPR &&
+      !actionFailed &&
+      resultText.trim() !== ""
+    ) {
+      try {
+        const client = createPlatformClient();
+        const pr = await client.getPullRequest(owner, repo, context.entityNumber);
+        const { event, body } = parseVerdict(resultText);
+        const review = await client.createPullReview({
+          owner,
+          repo,
+          prNumber: context.entityNumber,
+          event,
+          body,
+          commitId: pr.headRefOid,
+        });
+        const label =
+          event === "APPROVED"
+            ? "Approve"
+            : event === "REQUEST_CHANGES"
+              ? "Request changes"
+              : "Comment";
+        await updateClaudeComment(octokit.rest, {
+          owner,
+          repo,
+          commentId,
+          body: `✅ Review posted: **${label}**\n\n[Job](${jobUrl})`,
+          isPullRequestReviewComment: isPRReviewComment,
+        });
+        console.log(
+          `✅ Posted PR review ${review.id} (${event}) for commit ${pr.headRefOid.slice(0, 7)}; updated tracking comment ${commentId}`,
+        );
+        process.exit(0);
+      } catch (reviewError) {
+        console.error(
+          "Failed to post structured review; falling back to comment update:",
+          reviewError,
+        );
       }
     }
 

@@ -11,6 +11,7 @@ import {
   CreateCommentParams,
   UpdateCommentParams,
   CreateBranchParams,
+  type CreateReviewParams,
   User,
   Commit,
   PullRequestFile,
@@ -166,6 +167,34 @@ export class ForgejoClient implements IPlatformClient {
           createdAt: rc.created_at,
         })),
       })),
+    };
+  }
+
+  async createPullReview(params: CreateReviewParams): Promise<Review> {
+    const response = await this.request<any>(
+      `/repos/${params.owner}/${params.repo}/pulls/${params.prNumber}/reviews`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          event: params.event,
+          body: params.body,
+          ...(params.commitId ? { commit_id: params.commitId } : {}),
+        }),
+      }
+    );
+
+    return {
+      id: response.id,
+      author: {
+        login: response.user?.login ?? '',
+        name: response.user?.full_name,
+        id: response.user?.id ?? 0,
+      },
+      body: response.body || '',
+      state: this.mapReviewState(response.state),
+      submittedAt: response.submitted_at,
+      // A freshly created review carries no inline comments.
+      comments: [],
     };
   }
 

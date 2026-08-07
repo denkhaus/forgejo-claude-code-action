@@ -29,6 +29,10 @@ inputs:
     description: "Execution mode for the action. Valid modes: 'tag' (default - triggered by mentions/assignments), 'agent' (for automation with no trigger checking)"
     required: false
     default: "tag"
+  posting_mode:
+    description: "How to post the result: 'comment' (default - issue comment) or 'review' (structured PR review, PRs only; the agent's VERDICT marker maps to APPROVE/REQUEST_CHANGES/COMMENT). Ignored for issues."
+    required: false
+    default: "comment"
 
   # Claude Code configuration
   model:
@@ -295,6 +299,7 @@ runs:
         PREPARE_ERROR: ${{ steps.prepare.outputs.prepare_error || '' }}
         USE_STICKY_COMMENT: ${{ inputs.use_sticky_comment }}
         USE_COMMIT_SIGNING: ${{ inputs.use_commit_signing }}
+        POSTING_MODE: ${{ inputs.posting_mode }}
         # Forgejo specific
         FORGEJO_URL: ${{ inputs.forgejo_url }}
         FORGEJO_EXTERNAL_URL: ${{ inputs.forgejo_external_url }}

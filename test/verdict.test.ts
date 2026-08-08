@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { parseVerdict } from "../src/github/operations/reviews/verdict";
+import { parseVerdict, detectReviewEvents } from "../src/github/operations/reviews/verdict";
 
 describe("parseVerdict", () => {
   it("maps APPROVE marker to APPROVED and strips it from the body", () => {
@@ -71,5 +71,43 @@ describe("parseVerdict", () => {
     const { event, body } = parseVerdict("   ");
     expect(event).toBe("COMMENT");
     expect(body.trim()).not.toBe("");
+  });
+});
+
+describe("detectReviewEvents", () => {
+  it("returns COMMENT when no marker is present", () => {
+    expect(detectReviewEvents("just a summary with no marker")).toBe("COMMENT");
+  });
+
+  it("finds a marker in a single line", () => {
+    expect(detectReviewEvents("Review text.\n\nVERDICT: APPROVE")).toBe("APPROVED");
+    expect(detectReviewEvents("VERDICT: REQUEST_CHANGES")).toBe("REQUEST_CHANGES");
+  });
+
+  it("regression #149: detects the verdict from the FULL transcript when the result line lacks the label", () => {
+    // The agent wrote "VERDICT: APPROVE" into its drafted review comment, but
+    // its final result line was only a terse summary with "**APPROVE**" and no
+    // VERDICT label. parseVerdict on just the result line falls back to COMMENT;
+    // detectReviewEvents on the whole transcript finds APPROVED.
+    const transcript = [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","input":{"body":"### Review\\n\\nNo findings.\\n\\nVERDICT: APPROVE"}}]}}',
+      '{"type":"result","result":"Review posted. Clean version bump — **APPROVE**."}',
+    ].join("\n");
+
+    const resultLine = "Review posted. Clean version bump — **APPROVE**.";
+
+    // The bug: parsing only the result line misses the marker.
+    expect(parseVerdict(resultLine).event).toBe("COMMENT");
+    // The fix: scanning the full transcript finds it.
+    expect(detectReviewEvents(transcript)).toBe("APPROVED");
+  });
+
+  it("last marker wins across a multi-message transcript", () => {
+    const transcript = [
+      "VERDICT: COMMENT",
+      "actually reconsidered",
+      "VERDICT: REQUEST_CHANGES",
+    ].join("\n\n");
+    expect(detectReviewEvents(transcript)).toBe("REQUEST_CHANGES");
   });
 });

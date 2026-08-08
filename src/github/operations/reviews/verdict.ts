@@ -46,23 +46,48 @@ function normalizeEvent(token: string): ReviewEvent {
 }
 
 /**
- * Parse the agent's final result text into a review event + non-empty body.
- * Missing or ambiguous verdict → COMMENT (safe default).
+ * Scan arbitrary text for the last VERDICT marker and return its event.
+ *
+ * Robust to WHERE in the transcript the agent emitted the marker: pass the
+ * FULL output-file content (the whole conversation), not just the final
+ * `result` line. The agent often writes VERDICT into a drafted review comment
+ * rather than its terse result summary (seen on PR #149, where the result line
+ * held only "— **APPROVE**." with no label → COMMENT fallback). Last match wins
+ * (the agent's real verdict is the last one it emits). Missing/unknown → COMMENT.
+ */
+export function detectReviewEvents(text: string): ReviewEvent {
+  const matches = [...(text ?? "").matchAll(VERDICT_RE)];
+  const last = matches[matches.length - 1];
+  return last && last[1] ? normalizeEvent(last[1]) : "COMMENT";
+}
+
+/** A non-empty review body fallback (Forgejo rejects empty comment bodies). */
+export function fallbackReviewBody(event: ReviewEvent): string {
+  return `Review posted (${EVENT_LABEL[event]}).`;
+}
+
+/**
+ * Parse a result text into a review event + non-empty body. Missing or
+ * ambiguous verdict → COMMENT (safe default).
+ *
+ * NOTE: for the EVENT, prefer `detectReviewEvents()` over the full transcript
+ * — the marker may live outside the result line (see detectReviewEvents). This
+ * helper pairs the event detected from `resultText` with a body derived from
+ * the same text; it's kept for tests and standalone use.
  */
 export function parseVerdict(resultText: string): ParsedVerdict {
-  const text = resultText ?? '';
-
-  const matches = [...text.matchAll(VERDICT_RE)];
-  const last = matches[matches.length - 1];
-  const event: ReviewEvent = last && last[1] ? normalizeEvent(last[1]) : 'COMMENT';
+  const text = resultText ?? "";
+  const event = detectReviewEvents(text);
 
   // Everything before the verdict marker is the review body. The marker is the
   // last thing the agent emits, so slicing to the match drops only the marker.
+  const matches = [...text.matchAll(VERDICT_RE)];
+  const last = matches[matches.length - 1];
   let body = last && last.index !== undefined ? text.slice(0, last.index) : text;
-  body = body.replace(/\s+$/, '');
+  body = body.replace(/\s+$/, "");
 
-  if (body.trim() === '') {
-    body = `Review posted (${EVENT_LABEL[event]}).`;
+  if (body.trim() === "") {
+    body = fallbackReviewBody(event);
   }
 
   return { event, body };

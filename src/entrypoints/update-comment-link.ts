@@ -16,7 +16,7 @@ import { updateClaudeComment } from "../github/operations/comments/update-claude
 import { detectPlatform, Platform } from "../platform/detector";
 import { getExternalBaseUrl } from "../platform/url-utils";
 import { createPlatformClient } from "../forgejo/api/rest-adapter";
-import { parseVerdict } from "../github/operations/reviews/verdict";
+import { detectReviewEvents, fallbackReviewBody } from "../github/operations/reviews/verdict";
 
 async function run() {
   try {
@@ -180,6 +180,10 @@ async function run() {
     let actionFailed = false;
     let errorDetails: string | undefined;
     let resultText = "";
+    // Raw output-file content (the full agent transcript). The VERDICT marker
+    // may live in a drafted comment rather than the final result line (PR #149),
+    // so the event is detected by scanning the whole transcript, not just resultText.
+    let rawTranscript = "";
 
     // First check if prepare step failed
     const prepareSuccess = process.env.PREPARE_SUCCESS !== "false";
@@ -194,6 +198,7 @@ async function run() {
         const outputFile = process.env.OUTPUT_FILE;
         if (outputFile) {
           const fileContent = await fs.readFile(outputFile, "utf8");
+          rawTranscript = fileContent;
           const outputData = JSON.parse(fileContent);
 
           // Output file is an array, get the last element which contains execution details
@@ -237,7 +242,12 @@ async function run() {
       try {
         const client = createPlatformClient();
         const pr = await client.getPullRequest(owner, repo, context.entityNumber);
-        const { event, body } = parseVerdict(resultText);
+        // Event: scan the FULL transcript (last VERDICT wins) — the marker often
+        // lives in a drafted review comment, not the terse result line (PR #149,
+        // where resultText had only "— **APPROVE**." → wrong COMMENT fallback).
+        // Body: the agent's result summary; non-empty via fallback.
+        const event = detectReviewEvents(rawTranscript);
+        const body = resultText.trim() || fallbackReviewBody(event);
         const review = await client.createPullReview({
           owner,
           repo,

@@ -20,10 +20,11 @@ export interface ParsedVerdict {
   body: string;
 }
 
-// Tolerates surrounding markdown emphasis (**VERDICT**:) and the common
-// past-tense alias (APPROVED / CHANGES_REQUESTED).
+// Tolerates surrounding markdown emphasis on the label (**VERDICT**:) and on
+// the value (VERDICT: **APPROVE** — the form the agent actually emits, seen on
+// PR #146), plus the common past-tense alias (APPROVED / CHANGES_REQUESTED).
 const VERDICT_RE =
-  /\**\s*VERDICT\s*\**:\s*(APPROVE|APPROVED|REQUEST_CHANGES|CHANGES_REQUESTED|COMMENT)\b/gi;
+  /\**\s*VERDICT\s*\**:\s*\**\s*(APPROVE|APPROVED|REQUEST_CHANGES|CHANGES_REQUESTED|COMMENT)\b/gi;
 
 const EVENT_LABEL: Record<ReviewEvent, string> = {
   APPROVED: 'Approve',

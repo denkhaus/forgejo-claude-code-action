@@ -31,6 +31,15 @@ describe("parseVerdict", () => {
     expect(body).toBe("All good.");
   });
 
+  it("tolerates markdown bold around the verdict VALUE", () => {
+    // The agent emits "Verdict: **APPROVE**" (bold on the value, not the label)
+    // — the form observed on PR #146. Must still map to APPROVED and strip the
+    // marker (incl. the trailing **) from the body.
+    const { event, body } = parseVerdict("Looks good.\n\nVerdict: **APPROVE**");
+    expect(event).toBe("APPROVED");
+    expect(body).toBe("Looks good.");
+  });
+
   it("accepts the past-tense aliases APPROVED / CHANGES_REQUESTED", () => {
     expect(parseVerdict("VERDICT: APPROVED").event).toBe("APPROVED");
     expect(parseVerdict("VERDICT: CHANGES_REQUESTED").event).toBe("REQUEST_CHANGES");

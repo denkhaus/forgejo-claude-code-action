@@ -130,9 +130,10 @@ Add the `claude` label to an issue to trigger the action.
 - `custom_instructions_file`: Path to a file whose contents replace `custom_instructions` (file takes precedence when set; relative to the workspace root)
 - `direct_prompt_file`: Path to a file whose contents replace `direct_prompt` (file takes precedence when set; relative to the workspace root)
 - `suppress_claude_md`: When `true`, remove the repository's `CLAUDE.md` files before Claude Code runs and omit the "follow CLAUDE.md" prompt instructions, so the dev `CLAUDE.md` does not steer a CI agent (default: `false`)
+- `suppress_agents_md`: When `true`, remove the repository's `AGENTS.md` files before Claude Code runs, so the dev `AGENTS.md` does not steer a CI agent (default: `false`)
 - `use_sticky_comment`: Use a single comment that updates with progress (default: `true`)
 
-### Prompt files & CLAUDE.md suppression
+### Prompt files & CLAUDE.md/AGENTS.md suppression
 
 `custom_instructions_file` and `direct_prompt_file` let you keep prompts as files
 in the repo (e.g. `.forgejo/prompts/<scope>/instructions.md`) instead of inline
@@ -141,6 +142,9 @@ the inline `custom_instructions` / `direct_prompt`. `suppress_claude_md: true`
 removes the repository's `CLAUDE.md` (and `.claude/CLAUDE.md`) before the run and
 drops the "follow CLAUDE.md" prompt lines, so a CI review agent is steered only
 by its prompt file, not the repo's dev-facing `CLAUDE.md`.
+
+`suppress_agents_md: true` does the same for the repository's `AGENTS.md` (and
+`.claude/AGENTS.md`) — relevant because Claude Code 2.x auto-loads `AGENTS.md`.
 
 ## Limitations
 

@@ -49,6 +49,7 @@ export type ParsedGitHubContext = {
     useCommitSigning: boolean;
     // Optional because mocks omit it; parseGitHubContext always sets it.
     suppressClaudeMd?: boolean;
+    suppressAgentsMd?: boolean;
   };
 };
 
@@ -92,6 +93,7 @@ export function parseGitHubContext(): ParsedGitHubContext {
         process.env.DIRECT_PROMPT_FILE ?? "",
       ),
       suppressClaudeMd: process.env.SUPPRESS_CLAUDE_MD === "true",
+      suppressAgentsMd: process.env.SUPPRESS_AGENTS_MD === "true",
       overridePrompt: process.env.OVERRIDE_PROMPT ?? "",
       baseBranch: process.env.BASE_BRANCH,
       branchPrefix: process.env.BRANCH_PREFIX ?? "claude/",

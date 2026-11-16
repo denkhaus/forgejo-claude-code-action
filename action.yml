@@ -76,6 +76,10 @@ inputs:
     description: "When 'true', remove the repository's CLAUDE.md files before Claude Code runs and omit the 'follow CLAUDE.md' prompt instructions, so the dev CLAUDE.md does not steer the CI agent."
     required: false
     default: "false"
+  suppress_agents_md:
+    description: "When 'true', remove the repository's AGENTS.md files before Claude Code runs, so the dev AGENTS.md does not steer the CI agent."
+    required: false
+    default: "false"
   mcp_config:
     description: "Additional MCP configuration (JSON string) that merges with the built-in GitHub MCP servers"
   additional_permissions:
@@ -171,6 +175,13 @@ runs:
         rm -f "$GITHUB_WORKSPACE/CLAUDE.md" "$GITHUB_WORKSPACE/.claude/CLAUDE.md"
         echo "Suppressed project CLAUDE.md (suppress_claude_md=true)."
 
+    - name: Suppress project AGENTS.md
+      if: inputs.suppress_agents_md == 'true'
+      shell: bash
+      run: |
+        rm -f "$GITHUB_WORKSPACE/AGENTS.md" "$GITHUB_WORKSPACE/.claude/AGENTS.md"
+        echo "Suppressed project AGENTS.md (suppress_agents_md=true)."
+
     - name: Prepare action
       id: prepare
       shell: bash
@@ -198,6 +209,7 @@ runs:
         CUSTOM_INSTRUCTIONS_FILE: ${{ inputs.custom_instructions_file }}
         DIRECT_PROMPT_FILE: ${{ inputs.direct_prompt_file }}
         SUPPRESS_CLAUDE_MD: ${{ inputs.suppress_claude_md }}
+        SUPPRESS_AGENTS_MD: ${{ inputs.suppress_agents_md }}
 
     - name: Install Base Action Dependencies
       if: steps.prepare.outputs.contains_trigger == 'true'

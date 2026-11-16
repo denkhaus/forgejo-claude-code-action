@@ -9,6 +9,7 @@ export type CommonFields = {
   directPrompt?: string;
   overridePrompt?: string;
   suppressClaudeMd?: boolean;
+  suppressAgentsMd?: boolean;
 };
 
 type PullRequestReviewCommentEvent = {

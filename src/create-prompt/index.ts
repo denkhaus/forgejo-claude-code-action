@@ -164,6 +164,7 @@ export function prepareContext(
     ...(directPrompt && { directPrompt }),
     ...(overridePrompt && { overridePrompt }),
     ...(context.inputs.suppressClaudeMd && { suppressClaudeMd: true }),
+    ...(context.inputs.suppressAgentsMd && { suppressAgentsMd: true }),
     ...(claudeBranch && { claudeBranch }),
   };
 
